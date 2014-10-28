@@ -11,7 +11,7 @@ def index():
 @app.route('/data')
 def names():
     data = {
-        "first_names": ["John", "Jacob", "Julie", "Jenn"]
+        "first_names": ["John", "Jacob", "Julie"]
     }
     return jsonify(data)
 
