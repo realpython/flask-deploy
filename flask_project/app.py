@@ -8,10 +8,10 @@ def index():
     return 'Flask is running!'
 
 
-# @app.route('/data')
+@app.route('/data')
 def names():
     data = {
-        "first_names": ["John", "Jacob", "Julie", "Jennifer"]
+        "first_names": ["John", "Jacob", "Julie"]
     }
     return jsonify(data)
 
