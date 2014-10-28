@@ -2,7 +2,7 @@
 ### imports ###
 ###############
 
-from fabric.api import run, cd, env, lcd, put, prompt, local
+from fabric.api import cd, env, lcd, put, prompt, local, sudo
 from fabric.contrib.files import exists
 
 
@@ -14,13 +14,14 @@ local_app_dir = './flask_project'
 local_config_dir = './config'
 
 remote_app_dir = '/home/www'
+remote_git_dir = '/home/git'
 remote_flask_dir = remote_app_dir + '/flask_project'
 remote_nginx_dir = '/etc/nginx/sites-enabled'
 remote_supervisor_dir = '/etc/supervisor/conf.d'
 
-env.hosts = ['104.131.123.130']  # replace with IP address or hostname
-env.user = 'root'
-# env.password = 'password'
+env.hosts = ['add_ip_or_domain']  # replace with IP address or hostname
+env.user = 'newuser'
+# env.password = 'blah!'
 
 
 #############
@@ -29,14 +30,14 @@ env.user = 'root'
 
 def install_requirements():
     """ Install required packages. """
-    run('apt-get update')
-    run('apt-get install -y python')
-    run('apt-get install -y python-pip')
-    run('apt-get install -y python-virtualenv')
-    run('apt-get install -y nginx')
-    run('apt-get install -y gunicorn')
-    run('apt-get install -y supervisor')
-    run('apt-get install -y git')
+    sudo('apt-get update')
+    sudo('apt-get install -y python')
+    sudo('apt-get install -y python-pip')
+    sudo('apt-get install -y python-virtualenv')
+    sudo('apt-get install -y nginx')
+    sudo('apt-get install -y gunicorn')
+    sudo('apt-get install -y supervisor')
+    sudo('apt-get install -y git')
 
 
 def install_flask():
@@ -46,16 +47,16 @@ def install_flask():
     3. Copy Flask files to remote host
     """
     if exists(remote_app_dir) is False:
-        run('mkdir ' + remote_app_dir)
+        sudo('mkdir ' + remote_app_dir)
     if exists(remote_flask_dir) is False:
-        run('mkdir ' + remote_flask_dir)
+        sudo('mkdir ' + remote_flask_dir)
     with lcd(local_app_dir):
         with cd(remote_app_dir):
-            run('virtualenv env')
-            run('source env/bin/activate')
-            run('pip install Flask==0.10.1')
+            sudo('virtualenv env')
+            sudo('source env/bin/activate')
+            sudo('pip install Flask==0.10.1')
         with cd(remote_flask_dir):
-            put('*', './')
+            put('*', './', use_sudo=True)
 
 
 def configure_nginx():
@@ -66,17 +67,17 @@ def configure_nginx():
     4. Copy local config to remote config
     5. Restart nginx
     """
-    run('/etc/init.d/nginx start')
+    sudo('/etc/init.d/nginx start')
     if exists('/etc/nginx/sites-enabled/default'):
-        run('rm /etc/nginx/sites-enabled/default')
+        sudo('rm /etc/nginx/sites-enabled/default')
     if exists('/etc/nginx/sites-enabled/flask_project') is False:
-        run('touch /etc/nginx/sites-available/flask_project')
-        run('ln -s /etc/nginx/sites-available/flask_project' +
-            ' /etc/nginx/sites-enabled/flask_project')
+        sudo('touch /etc/nginx/sites-available/flask_project')
+        sudo('ln -s /etc/nginx/sites-available/flask_project' +
+             ' /etc/nginx/sites-enabled/flask_project')
     with lcd(local_config_dir):
         with cd(remote_nginx_dir):
-            put('./flask_project', './')
-    run('/etc/init.d/nginx restart')
+            put('./flask_project', './', use_sudo=True)
+    sudo('/etc/init.d/nginx restart')
 
 
 def configure_supervisor():
@@ -88,9 +89,9 @@ def configure_supervisor():
     if exists('/etc/supervisor/conf.d/flask_project.conf') is False:
         with lcd(local_config_dir):
             with cd(remote_supervisor_dir):
-                put('./flask_project.conf', './')
-                run('supervisorctl reread')
-                run('supervisorctl update')
+                put('./flask_project.conf', './', use_sudo=True)
+                sudo('supervisorctl reread')
+                sudo('supervisorctl update')
 
 
 def configure_git():
@@ -98,21 +99,22 @@ def configure_git():
     1. Setup bare Git repo
     2. Create post-receive hook
     """
-    if exists('/' + env.user + '/flask_project.git') is False:
-        with cd('/' + env.user):
-            run('mkdir flask_project.git')
+    if exists(remote_git_dir) is False:
+        sudo('mkdir ' + remote_git_dir)
+        with cd(remote_git_dir):
+            sudo('mkdir flask_project.git')
             with cd('flask_project.git'):
-                run('git init --bare')
+                sudo('git init --bare')
                 with lcd(local_config_dir):
                     with cd('hooks'):
-                        put('./post-receive', './')
-                        run('chmod +x post-receive')
+                        put('./post-receive', './', use_sudo=True)
+                        sudo('chmod +x post-receive')
 
 
 def run_app():
     """ Run the app! """
     with cd(remote_flask_dir):
-        run('supervisorctl start flask_project')
+        sudo('supervisorctl start flask_project')
 
 
 def deploy():
@@ -125,7 +127,7 @@ def deploy():
         commit_message = prompt("Commit message?")
         local('git commit -am "{0}"'.format(commit_message))
         local('git push production master')
-        run('supervisorctl restart flask_project')
+        sudo('supervisorctl restart flask_project')
 
 
 def rollback():
@@ -136,12 +138,12 @@ def rollback():
     with lcd(local_app_dir):
         local('git revert master  --no-edit')
         local('git push production master')
-        run('supervisorctl restart flask_project')
+        sudo('supervisorctl restart flask_project')
 
 
 def status():
     """ Is our app live? """
-    run('supervisorctl status')
+    sudo('supervisorctl status')
 
 
 def create():
